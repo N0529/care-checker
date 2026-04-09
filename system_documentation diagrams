@@ -1,0 +1,338 @@
+# CareCheck System Documentation
+
+This document contains architectural diagrams and the data dictionary for the CareCheck platform based on the current definitions in [models.py](file:///c:/Users/ASUS/Desktop/care%20checker/backend/models.py).
+
+## 1. Entity-Relationship (ER) Diagram
+This diagram illustrates the logical relationships between the database entities.
+
+```mermaid
+erDiagram
+    User ||--o{ Review : "writes"
+    Hospital ||--o{ Department : "contains"
+    Hospital ||--o{ Review : "receives"
+    Review ||--o{ ReviewMedia : "includes"
+    Hospital }|--|{ InsuranceProvider : "accepts / is covered by"
+
+    User {
+        Integer id PK
+        String username
+        String email
+        String password_hash
+        String role
+        Boolean is_verified
+        DateTime created_at
+    }
+    Hospital {
+        Integer id PK
+        String name
+        String address
+        Float latitude
+        Float longitude
+        Float average_rating
+        Integer review_count
+        DateTime created_at
+        DateTime updated_at
+    }
+    Review {
+        Integer id PK
+        Integer hospital_id FK
+        Integer user_id FK
+        Integer wait_time_score
+        Integer billing_transparency_score
+        Float treatment_cost
+        String procedure_type
+        Boolean insurance_accepted
+        Text review_text
+        String status
+        DateTime submitted_at
+    }
+    Department {
+        Integer id PK
+        Integer hospital_id FK
+        String department_name
+        String contact_number
+        Boolean is_24_hours
+    }
+    InsuranceProvider {
+        Integer id PK
+        String name
+        String type
+    }
+    ReviewMedia {
+        Integer id PK
+        Integer review_id FK
+        String file_url
+        String file_type
+        DateTime uploaded_at
+    }
+```
+
+## 2. Data Flow Diagram (DFD) - Level 1
+This diagram maps how data enters, moves through, and leaves the CareCheck platform.
+
+```mermaid
+flowchart TD
+    %% Entities
+    Pat((Patient))
+    Admin((System Admin))
+    
+    %% Processes
+    UI[Frontend Web Interface\nHTML/JS]
+    API[Flask Backend API\nRouting & Logic]
+    DB[(SQLite Database)]
+    
+    %% Flows
+    Pat -->|"1. Submits Search Request\nor Review Data"| UI
+    Admin -->|"1. Submits Management Actions"| UI
+    
+    UI -->|"2. HTTP Requests (JSON)\nGET/POST"| API
+    API -->|"3. SQLAlchemy ORM Queries"| DB
+    DB -->|"4. Fetched Records / Success Confirm"| API
+    API -->|"5. HTTP Responses (JSON/Status)"| UI
+    
+    UI -->|"6. Rendered UI Updates\n(Maps, Lists, Notifications)"| Pat
+    UI -->|"6. Management Dashboard"| Admin
+```
+
+## 3. Class Diagram
+This captures the object-oriented structure of the backend SQLAlchemy models.
+
+```mermaid
+classDiagram
+    direction TB
+    class User {
+        +Integer id
+        +String username
+        +String email
+        +String password_hash
+        +String role
+        +Boolean is_verified
+        +DateTime created_at
+    }
+
+    class Hospital {
+        +Integer id
+        +String name
+        +String address
+        +Float latitude
+        +Float longitude
+        +Float average_rating
+        +Integer review_count
+        +DateTime created_at
+        +DateTime updated_at
+        +to_dict() dict
+    }
+
+    class Review {
+        +Integer id
+        +Integer hospital_id
+        +Integer user_id
+        +Integer wait_time_score
+        +Integer billing_transparency_score
+        +Float treatment_cost
+        +String procedure_type
+        +Boolean insurance_accepted
+        +Text review_text
+        +String status
+        +DateTime submitted_at
+        +to_dict() dict
+    }
+
+    class Department {
+        +Integer id
+        +Integer hospital_id
+        +String department_name
+        +String contact_number
+        +Boolean is_24_hours
+    }
+
+    class InsuranceProvider {
+        +Integer id
+        +String name
+        +String type
+    }
+    
+    class ReviewMedia {
+        +Integer id
+        +Integer review_id
+        +String file_url
+        +String file_type
+        +DateTime uploaded_at
+        +to_dict() dict
+    }
+
+    User "1" -- "*" Review : creates >
+    Hospital "1" *-- "*" Department : owns >
+    Hospital "1" -- "*" Review : targets >
+    Review "1" *-- "*" ReviewMedia : attaches >
+    Hospital "*" -- "*" InsuranceProvider : hospital_insurance
+```
+
+## 4. Use Case Diagram
+This outlines the interactions that users (actors) have with the system.
+
+```mermaid
+flowchart LR
+    Patient((Patient))
+    Admin((Admin))
+    HRep((Hospital\nRepresentative))
+
+    subgraph CareCheck Platform
+        UC1([Search for Hospitals])
+        UC2([View Hospital Ratings & Details])
+        UC3([Submit Hospital Review])
+        UC4([Attach Proof/Media])
+        
+        UC5([Approve/Reject Reviews])
+        UC6([Manage Platform Users])
+        
+        UC7([Update Department Details])
+        UC8([Update Accepted Insurances])
+    end
+
+    Patient --> UC1
+    Patient --> UC2
+    Patient --> UC3
+    Patient --> UC4
+
+    Admin --> UC5
+    Admin --> UC6
+    
+    HRep --> UC7
+    HRep --> UC8
+    HRep -.->|Maybe| UC2
+```
+
+## 5. Data Dictionary
+Detailed breakdown of the exact tables and columns being created by SQLAlchemy.
+
+### Table: `users`
+| Column | Type | Default/Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| [id](file:///c:/Users/ASUS/Desktop/care%20checker/backend/models.py#24-29) | Integer | Primary Key | Unique identifier for each user. |
+| `username` | String(80) | Not Null, Unique | Chosen display name. |
+| `email` | String(120) | Not Null, Unique | Email for authentication/comms. |
+| `password_hash` | String(255) | Not Null | Hashed password for security. |
+| `role` | String(50) | 'Patient' | RBAC role: Patient, Admin, HospitalRep. |
+| `is_verified` | Boolean | False | Email verification status limit spam. |
+| `created_at` | DateTime | Current UTC Time | Timestamp of registration. |
+
+### Table: `hospitals`
+| Column | Type | Default/Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| [id](file:///c:/Users/ASUS/Desktop/care%20checker/backend/models.py#24-29) | Integer | Primary Key | Unique identifier for the facility. |
+| `name` | String(255) | Not Null | Official name of the hospital. |
+| `address` | String(500) | Not Null | Physical location string. |
+| `latitude` | Float | Not Null | Map coordinate. |
+| `longitude` | Float | Not Null | Map coordinate. |
+| `average_rating` | Float | 0.0 | Aggregated score from reviews. |
+| `review_count` | Integer | 0 | Total number of approved reviews. |
+| `created_at` | DateTime | Current UTC Time | When the record was created. |
+| `updated_at` | DateTime | Current UTC Time | When the record was last modified. |
+
+### Table: `reviews`
+| Column | Type | Default/Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| [id](file:///c:/Users/ASUS/Desktop/care%20checker/backend/models.py#24-29) | Integer | Primary Key | Unique Review ID. |
+| `hospital_id` | Integer | FK (hospitals.id), Not Null | Target of the review. |
+| `user_id` | Integer | FK (users.id), Nullable | Author (Nullable for legacy). |
+| `wait_time_score` | Integer | Not Null | Rated score (e.g., 1-5). |
+| `billing_transparency_score`| Integer | Not Null | Rated score (e.g., 1-5). |
+| `treatment_cost` | Float | Nullable | Cost incurred by the patient. |
+| `procedure_type` | String(255) | Nullable | Procedure undergone. |
+| `insurance_accepted`| Boolean | Nullable | Was their insurance honored? |
+| `review_text` | Text | Nullable | Qualitative text feedback. |
+| `status` | String(50) | 'Pending' | Moderation status (Pending/Approved/Rejected). |
+| `submitted_at` | DateTime | Current UTC Time | When the review was recorded. |
+
+### Table: `departments`
+| Column | Type | Default/Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| [id](file:///c:/Users/ASUS/Desktop/care%20checker/backend/models.py#24-29) | Integer | Primary Key | Unique Department ID. |
+| `hospital_id` | Integer | FK (hospitals.id), Not Null | Hospital the department belongs to. |
+| `department_name` | String(255) | Not Null | Name (e.g., Cardiology, ICU). |
+| `contact_number` | String(50) | Nullable | Direct line. |
+| `is_24_hours` | Boolean | False | Is it open continuously? |
+
+### Table: `insurance_providers`
+| Column | Type | Default/Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| [id](file:///c:/Users/ASUS/Desktop/care%20checker/backend/models.py#24-29) | Integer | Primary Key | Unique Provider ID. |
+| `name` | String(255) | Not Null | Name of scheme or company. |
+| `type` | String(100) | Nullable | Category (e.g., Private, Government). |
+
+### Table: `review_media`
+| Column | Type | Default/Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| [id](file:///c:/Users/ASUS/Desktop/care%20checker/backend/models.py#24-29) | Integer | Primary Key | Unique Media ID. |
+| `review_id` | Integer | FK (reviews.id), Not Null | Review it belongs to. |
+| `file_url` | String(500) | Not Null | Path/URL to the stored file. |
+| `file_type` | String(100) | Not Null | MIME type or category (e.g., image/png). |
+| `uploaded_at` | DateTime | Current UTC Time | Upload timestamp. |
+
+### Table: `hospital_insurance` (Join Table)
+| Column | Type | Default/Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `hospital_id` | Integer | PK, FK (hospitals.id) | Link to hospital. |
+| `insurance_id` | Integer | PK, FK (insurance_providers.id) | Link to insurance. |
+
+## 6. Context-Level Data Flow Diagram (Level 0 DFD)
+This diagram illustrates the CareCheck platform as a single process and its interactions with external entities.
+
+```mermaid
+flowchart TD
+    %% Entities
+    Patient((Patient))
+    Admin((System Admin))
+    HRep((Hospital\nRepresentative))
+    
+    %% System
+    System[0\nCareCheck Platform]
+    
+    %% Data Flows
+    Patient -->|"Search Queries, Review Data, Media"| System
+    System -->|"Search Results, Hospital Details, Notifications"| Patient
+    
+    Admin -->|"Moderation Tasks, User Management"| System
+    System -->|"Pending Reviews, User Metrics"| Admin
+    
+    HRep -->|"Department & Insurance Updates"| System
+    System -->|"Update Confirmations"| HRep
+```
+
+## 7. Activity Diagram (Review Submission Flow)
+This diagram maps the step-by-step activity flow for the core process: searching for a hospital and submitting a review, including page redirects.
+
+```mermaid
+stateDiagram-v2
+    [*] --> SearchHospital: Patient accesses system
+    SearchHospital --> ViewResults: Enters search criteria
+    ViewResults --> ViewHospitalDetails: Selects a hospital
+    
+    ViewHospitalDetails --> [*]: Leaves page
+    ViewHospitalDetails --> FillReviewForm: Clicks 'Write a Review'
+    
+    FillReviewForm --> AttachMedia: Provides ratings and feedback
+    AttachMedia --> SubmitReview: Uploads optional proof
+    
+    SubmitReview --> ValidateData: System checks submission
+    ValidateData --> FillReviewForm: Invalid data (shows errors)
+    ValidateData --> ShowSuccessMsg: Valid data returns success
+    
+    ShowSuccessMsg --> RedirectToHospital: Redirect patient to Hospital Page
+    RedirectToHospital --> ViewHospitalDetails: Page Reload
+    
+    ShowSuccessMsg --> PendingModeration: System adds review to queue
+    
+    PendingModeration --> AdminReview: Admin checks queue
+    
+    AdminReview --> Approved: Content meets guidelines
+    AdminReview --> Rejected: Content violates policy
+    
+    Approved --> UpdateDatabase: Calculate new averages
+    UpdateDatabase --> PublishReview: Add to public listing
+    PublishReview --> [*]
+    
+    Rejected --> NotifyPatient: Send rejection email
+    NotifyPatient --> [*]
+```
