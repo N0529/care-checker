@@ -507,7 +507,10 @@ document.getElementById('add-hospital-form').addEventListener('submit', async (e
 
         if (res.ok) {
             addHospitalModal.classList.remove('show');
-            fetchHospitals(); 
+            await fetchHospitals(); 
+            if (map && lat && lon) {
+                map.setView([lat, lon], 14, { animate: true });
+            }
         } else {
             const data = await res.json();
             errorEl.textContent = data.error || 'Failed to add hospital';
